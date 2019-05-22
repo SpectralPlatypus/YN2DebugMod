@@ -1,9 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Reflection;
-using System.Text;
-using Pepperoni;
+﻿using Pepperoni;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 
@@ -11,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "4.0";
+        private const string _modVersion = "4.5";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 chantroPos = new Vector3(926f, 44f, 364.7f);
@@ -30,6 +25,8 @@ namespace DebugMod
             UnityEngine.Object.DontDestroyOnLoad(go);
         }
 
+
+
         private void OnSceneChange(Scene oldScene, Scene newScene)
         {
             LogDebug("New Scene Name: " + newScene.name);
@@ -37,7 +34,6 @@ namespace DebugMod
             var playerMachine = Manager.Player.GetComponent<PlayerMachine>();
             if (playerMachine)
             {
-                
                 counter.ToggleState(true, playerMachine);
             }
             else
@@ -80,7 +76,7 @@ namespace DebugMod
                 return text;
             }
 
-            return "%n9%v1%\r\nSpectral\r\n%m1%Have some fun with%m0%%s1% %m1%%sD%Mike!!\r\n\r\n%n\r\n";
+            return "%n9%v1%\r\nSpectral\r\n%m1%Have some fun with%m0%%s1% %m1%%sD%Warps!!\r\n\r\n%n\r\n";
         }
     }
 }

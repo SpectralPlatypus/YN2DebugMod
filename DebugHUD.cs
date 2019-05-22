@@ -2,10 +2,7 @@
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
 using Pepperoni;
-using Logger = Pepperoni.Logger;
-using System.Reflection;
 
 namespace DebugMod
 {
@@ -82,6 +79,7 @@ namespace DebugMod
         private int currentLvlIdx = 0;
         private float deltaTime = 0f;
         private bool _visible = false;
+        private bool deathPlaneStatus = true;
 
         public void Update()
         {
@@ -181,6 +179,7 @@ namespace DebugMod
                 else
                 {
                     string level = (!inVoid) ? "void" : levelNames[currentLvlIdx];
+                    deathPlaneStatus = true;
                     GameObject.Find("Global Manager").GetComponent<Manager>().LoadScene(level, pizza.ExitId, pizza.gameObject);
                 }
             }
@@ -190,6 +189,29 @@ namespace DebugMod
                 {
                     currentLvlIdx = (currentLvlIdx + 1) % levelNames.Length;
                 } while (levelNames[currentLvlIdx] == SceneManager.GetActiveScene().name);
+            }
+
+            if (Input.GetKeyDown(KeyCode.K))
+            {
+                var key = FindObjectsOfType<Key>();
+                foreach (var k in key)
+                {
+                    if (!k.pickedUp)
+                    {
+                        k.transform.position = PlayerMachine.gameObject.transform.position;
+                        break;
+                    }
+                }
+            }
+
+            if (Input.GetKeyDown(KeyCode.M) && (PlayerStates)PlayerMachine.currentState == PlayerStates.Wall)
+            {
+                var deathPlanes = FindObjectsOfType<VoidOut>();
+                deathPlaneStatus = !deathPlaneStatus;
+                foreach (var d in deathPlanes)
+                {
+                    d.setActive(deathPlaneStatus);
+                }
             }
 
             deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
@@ -203,6 +225,8 @@ namespace DebugMod
             t.text += "<F5>: Text Storage/Warp?\n";
             t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
             t.text += "<F7><L> Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
+            t.text += "<K>: Get All Keys\n";
+            t.text += "<M>: Death Planes: " + deathPlaneStatus + "\n";
             t.text += "<F11> Toggle UI\n\n";
             t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
             t.text += "Pos:" + PlayerMachine.transform.position + "\n";
