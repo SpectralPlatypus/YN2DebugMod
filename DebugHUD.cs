@@ -199,12 +199,11 @@ namespace DebugMod
                     if (!k.pickedUp)
                     {
                         k.transform.position = PlayerMachine.gameObject.transform.position;
-                        break;
                     }
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.M) && (PlayerStates)PlayerMachine.currentState == PlayerStates.Wall)
+            if (Input.GetKeyDown(KeyCode.M))
             {
                 var deathPlanes = FindObjectsOfType<VoidOut>();
                 deathPlaneStatus = !deathPlaneStatus;
