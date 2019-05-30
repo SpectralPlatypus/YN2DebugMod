@@ -151,7 +151,8 @@ namespace DebugMod
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.F5) || Input.GetKeyDown(KeyCode.Keypad5))
+            if ((Input.GetKeyDown(KeyCode.F5) || Input.GetKeyDown(KeyCode.Keypad5) || Input.GetMouseButtonDown(4))
+                && !PlayerMachine.currentState.Equals(PlayerStates.Loading))
             {
                 PlayerMachine.EndScene();
             }
