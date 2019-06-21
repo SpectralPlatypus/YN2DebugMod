@@ -3,6 +3,9 @@ using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Pepperoni;
+using System.Reflection;
+using System.IO;
+using Logger = Pepperoni.Logger;
 
 namespace DebugMod
 {
@@ -28,6 +31,7 @@ namespace DebugMod
         private bool _enabled = false;
 
         private List<NPCCache> dialogues = new List<NPCCache>(10);
+        private Texture2D glassTexture = null;
 
         public void Awake()
         {
@@ -44,6 +48,24 @@ namespace DebugMod
                     TextAnchor.UpperLeft,
                     new CanvasUtil.RectData(new Vector2(-5, -5), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1, 1)));
             }
+
+            foreach (string fn in Assembly.GetExecutingAssembly().GetManifestResourceNames())
+            {
+                if (fn.Contains("glass_texture"))
+                {
+                    using (Stream imageStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(fn))
+                    {
+                        byte[] imageBuffer = new byte[imageStream.Length];
+                        imageStream.Read(imageBuffer, 0, imageBuffer.Length);
+                        imageStream.Flush();
+                        glassTexture = new Texture2D(1, 1);
+                        glassTexture.LoadImage(imageBuffer);
+                        Logger.LogDebug("Loaded Glass Texture");
+                    }
+                    break;
+                }
+            }
+
         }
 
         private void BuildDialogueCache()
@@ -51,12 +73,13 @@ namespace DebugMod
             dialogues.Clear();
             currentNpcIdx = 0;
             var res = Resources.FindObjectsOfTypeAll<TextAsset>();
-            foreach(var textAsset in res)
+            foreach (var textAsset in res)
             {
                 if (textAsset.name.StartsWith("Dia", System.StringComparison.InvariantCultureIgnoreCase) &&
                     textAsset.text.StartsWith("%n"))
                 {
                     string npcName = Pepperoni.DialogueUtils.GetNPCName(textAsset.text);
+                    // Remove unused and/or broken NPC dialogues -- thanks Denise
                     if (npcName == string.Empty || npcName == "Denise") continue;
                     dialogues.Add(new NPCCache(npcName, textAsset));
                 }
@@ -175,7 +198,7 @@ namespace DebugMod
                 var pizza = FindObjectOfType<PizzaBox>();
                 if (pizza == null)
                 {
-                    Pepperoni.Logger.LogDebug("No PizzaBox!");
+                    Logger.LogDebug("No PizzaBox!");
                 }
                 else
                 {
@@ -214,23 +237,60 @@ namespace DebugMod
                 }
             }
 
+            if (Input.GetKeyDown(KeyCode.N))
+            {
+                if (Physics.Raycast(
+                    PlayerMachine.transform.position + PlayerMachine.controller.up * PlayerMachine.controller.height * 0.85f,
+                    PlayerMachine.lookDirection,
+                    out RaycastHit objHit))
+                {
+                    Logger.LogFine($"Hit an object: {objHit.collider.gameObject.name}");
+                    var renderer = objHit.collider.gameObject.GetComponent<Renderer>();
+                    var shader = Shader.Find("psx/trasparent/vertexlit");
+                    if (renderer && shader)
+                    {
+                        for(int i = 0; i < renderer.materials.Length; ++i)
+                        {
+                            var matl = renderer.materials[i];
+                            matl.shader = shader;
+                            matl.SetTexture("_MainTex", glassTexture);
+                            renderer.materials[i] = matl;
+                        }
+                        GameObject go = new GameObject();
+                        Vector3 start = PlayerMachine.transform.position + PlayerMachine.controller.up * PlayerMachine.controller.height * 0.85f;
+                        go.transform.position = start;
+                        var lineRenderer = go.AddComponent<LineRenderer>();
+                        lineRenderer.material = new Material(Shader.Find("Standard"));
+                        lineRenderer.material.SetColor("_Color", Color.red);
+                        lineRenderer.startColor = Color.red;
+                        lineRenderer.endColor = Color.red;
+                        lineRenderer.startWidth = 0.1f;
+                        lineRenderer.SetPosition(0, start);
+                        lineRenderer.SetPosition(1, objHit.point);
+                        Destroy(go, 0.3f);
+                    }
+                }
+            }
+
             deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
             bool? b = PlayerMachine.CoyoteFrameEnabled;
 
             t.text += "FPS: " + 1f / deltaTime + "\n";
             t.text += "<F1>: Coyote Frames: " + (b.HasValue ? b.Value.ToString() : "Default") + "\n";
             t.text += "<F2><[]>: Set Costume: " + costumeNames[currentCostIdx] + "\n";
-            if(dialogues.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogues[currentNpcIdx].npcName + "\n";
+            if (dialogues.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogues[currentNpcIdx].npcName + "\n";
             t.text += "<F4>: Time Scale: x" + Time.timeScale.ToString("F2") + "\n";
             t.text += "<F5>: Text Storage/Warp?\n";
             t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
             t.text += "<F7><L> Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
             t.text += "<K>: Get All Keys\n";
             t.text += "<M>: Death Planes: " + deathPlaneStatus + "\n";
+            t.text += "<N>: Set Obj Transparent\n";
             t.text += "<F11> Toggle UI\n\n";
             t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
             t.text += "Pos:" + PlayerMachine.transform.position + "\n";
             t.text += "SpawnPos:" + PlayerMachine.LastGroundLoc.ToString() + "\n";
+            t.text += "Look Dir:" + PlayerMachine.lookDirection.ToString() + "\n";
             t.text += "Player State:" + PlayerMachine.currentState.ToString() + "\n";
         }
     }
