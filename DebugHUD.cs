@@ -26,11 +26,12 @@ namespace DebugMod
         public static GameObject OverlayCanvas = null;
         private static GameObject _textPanel;
         private static CanvasUtil.RectData topRight = new CanvasUtil.RectData(new Vector2(0, 0), new Vector2(0, 0),
-                    new Vector2(0.85f, 0.80f), new Vector2(0.95f, .96f), new Vector2(0, 0));
+                    new Vector2(0.89f, 0.80f), new Vector2(0.99f, .96f), new Vector2(0, 0));
         private static PlayerMachine PlayerMachine = null;
         private bool _enabled = false;
 
         private List<NPCCache> dialogues = new List<NPCCache>(10);
+        private List<GameObject> collisionPlaneCache = new List<GameObject>(5);
         private Texture2D glassTexture = null;
 
         public void Awake()
@@ -44,7 +45,7 @@ namespace DebugMod
                 DontDestroyOnLoad(OverlayCanvas);
 
                 GameObject _background = CanvasUtil.CreateImagePanel(OverlayCanvas, new Color32(0x28, 0x28, 0x28, 0x00), topRight);
-                _textPanel = CanvasUtil.CreateTMProPanel(_background, string.Empty, 24,
+                _textPanel = CanvasUtil.CreateTMProPanel(_background, string.Empty, 20,
                     TextAnchor.UpperLeft,
                     new CanvasUtil.RectData(new Vector2(-5, -5), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1, 1)));
             }
@@ -86,12 +87,52 @@ namespace DebugMod
             }
         }
 
+        private void BuildCollisionCache()
+        {
+            collisionPlaneCache.Clear();
+            var deathPlanes = FindObjectsOfType<VoidOut>();
+            foreach (var d in deathPlanes)
+            {
+                var collObj = d.GetComponent<Collider>();
+                Logger.LogDebug("Found Collider of type " + collObj.GetType().Name);
+
+                if (!(collObj is BoxCollider) && !(collObj is MeshCollider))
+                    continue;
+
+                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+
+                if (collObj is BoxCollider)
+                {
+                    var boxCol = collObj as BoxCollider;
+                    go.transform.position = boxCol.transform.TransformPoint(boxCol.center);
+                    go.transform.localScale = boxCol.bounds.size;
+                    go.GetComponent<MeshRenderer>().material.color = Color.white;
+                }
+                else
+                {
+                    var meshCol = collObj as MeshCollider;
+                    go.transform.position = d.transform.position;
+                    go.transform.localScale = meshCol.transform.localScale;
+                    go.GetComponent<MeshFilter>().mesh = meshCol.sharedMesh;
+                    go.GetComponent<MeshRenderer>().material.color = Color.grey;
+                }
+
+                go.GetComponent<Collider>().enabled = false;
+                go.GetComponent<MeshRenderer>().receiveShadows = false;
+                collisionPlaneCache.Add(go);
+            }
+        }
+
         public void ToggleState(bool enabled, PlayerMachine playerMachine)
         {
             _enabled = enabled;
             PlayerMachine = (_enabled) ? playerMachine : null;
 
-            if (_enabled) BuildDialogueCache();
+            if (_enabled)
+            {
+                BuildDialogueCache();
+                collisionRenderFlag = false;
+            }
         }
 
         private static readonly int MAX_COSTUME_INDEX = 3;
@@ -103,6 +144,7 @@ namespace DebugMod
         private float deltaTime = 0f;
         private bool _visible = false;
         private bool deathPlaneStatus = true;
+        private bool collisionRenderFlag = false;
 
         public void Update()
         {
@@ -227,6 +269,35 @@ namespace DebugMod
                 }
             }
 
+            if (Input.GetKeyDown(KeyCode.G))
+            {
+                foreach (var tv in FindObjectsOfType<TalkVolume>())
+                {
+                    if (tv.gameObject.GetComponent<LineRenderer>())
+                        continue;
+
+                    var line = tv.gameObject.AddComponent<LineRenderer>();
+                    var collider = tv.gameObject.GetComponent<Collider>();
+                    if(collider is SphereCollider)
+                    {
+                        float radius = (collider as SphereCollider).radius;
+                        line.useWorldSpace = false;
+                        line.startWidth = .1f;
+                        line.endWidth = .1f;
+                        line.positionCount = 360 + 1;
+                        var pointCount = 360 + 1; // add extra point to make startpoint and endpoint the same to close the circle
+                        var points = new Vector3[pointCount];
+                        for (int i = 0; i < pointCount; i++)
+                        {
+                            var rad = Mathf.Deg2Rad * (i * 360f / 360);
+                            points[i] = new Vector3(Mathf.Sin(rad) * radius, 0, Mathf.Cos(rad) * radius);
+                        }
+
+                        line.SetPositions(points);
+                    }
+                }
+            }
+
             if (Input.GetKeyDown(KeyCode.M))
             {
                 var deathPlanes = FindObjectsOfType<VoidOut>();
@@ -235,6 +306,20 @@ namespace DebugMod
                 {
                     d.setActive(deathPlaneStatus);
                 }
+            }
+            else if (Input.GetKeyDown(KeyCode.V))
+            {
+                collisionRenderFlag = !collisionRenderFlag;
+                if(collisionRenderFlag)
+                {
+                    BuildCollisionCache();
+                }
+                foreach (var c in collisionPlaneCache)
+                {
+                    if (c == null) break;
+                    c.SetActive(collisionRenderFlag);
+                }
+
             }
 
             if (Input.GetKeyDown(KeyCode.N))
@@ -284,8 +369,10 @@ namespace DebugMod
             t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
             t.text += "<F7><L> Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
             t.text += "<K>: Get All Keys\n";
+            t.text += "<V>: Render Death Planes: " + collisionRenderFlag + "\n";
             t.text += "<M>: Death Planes: " + deathPlaneStatus + "\n";
             t.text += "<N>: Set Obj Transparent\n";
+            t.text += "<G>: Show NPC Talk Zone\n";
             t.text += "<F11> Toggle UI\n\n";
             t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
             t.text += "Pos:" + PlayerMachine.transform.position + "\n";
