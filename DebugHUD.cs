@@ -211,7 +211,7 @@ namespace DebugMod
                 if (Time.timeScale > 0)
                 {
                     float timeScale = Time.timeScale / 2;
-                    if (timeScale < 0.25f) timeScale = 1.0f;
+                    if (timeScale < 0.25f) timeScale = 2.0f;
                     Time.timeScale = timeScale;
                 }
             }
@@ -361,16 +361,16 @@ namespace DebugMod
             bool? b = PlayerMachine.CoyoteFrameEnabled;
 
             t.text += "FPS: " + 1f / deltaTime + "\n";
-            t.text += "<F1>: Coyote Frames: " + (b.HasValue ? b.Value.ToString() : "Default") + "\n";
+            t.text += "<F1>: Coyote Frames: " + (b.HasValue ? (b.Value ? "ON" : "OFF") : "Default") + "\n";
             t.text += "<F2><[]>: Set Costume: " + costumeNames[currentCostIdx] + "\n";
             if (dialogues.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogues[currentNpcIdx].npcName + "\n";
             t.text += "<F4>: Time Scale: x" + Time.timeScale.ToString("F2") + "\n";
-            t.text += "<F5>: Text Storage/Warp?\n";
+            t.text += "<F5>: Text Storage/Warp\n";
             t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
-            t.text += "<F7><L> Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
+            t.text += "<F7><L>: Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
             t.text += "<K>: Get All Keys\n";
-            t.text += "<V>: Render Death Planes: " + collisionRenderFlag + "\n";
-            t.text += "<M>: Death Planes: " + deathPlaneStatus + "\n";
+            t.text += "<V>: Render Death Planes: " + (collisionRenderFlag ? "ON" : "OFF") + "\n";
+            t.text += "<M>: Active Death Planes: " + (deathPlaneStatus ? "ON" : "OFF") + "\n";
             t.text += "<N>: Set Obj Transparent\n";
             t.text += "<G>: Show NPC Talk Zone\n";
             t.text += "<F11> Toggle UI\n\n";
@@ -382,3 +382,4 @@ namespace DebugMod
         }
     }
 }
+
