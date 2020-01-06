@@ -1,10 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using Pepperoni;
+using System.Collections.Generic;
+using System.IO;
+using System.Reflection;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using Pepperoni;
-using System.Reflection;
-using System.IO;
 using Logger = Pepperoni.Logger;
 
 namespace DebugMod
@@ -29,11 +29,13 @@ namespace DebugMod
                     new Vector2(0.89f, 0.80f), new Vector2(0.99f, .96f), new Vector2(0, 0));
         private static PlayerMachine PlayerMachine = null;
         private bool _enabled = false;
+        private float yaw = 0f;
+        private float pitch = 0f;
 
         private List<NPCCache> dialogues = new List<NPCCache>(10);
         private List<GameObject> collisionPlaneCache = new List<GameObject>(5);
         private Texture2D glassTexture = null;
-
+        private Camera warpCam = null;
         public void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -66,7 +68,10 @@ namespace DebugMod
                     break;
                 }
             }
-
+            warpCam = gameObject.AddComponent<Camera>();
+            warpCam.rect = new Rect(0.75f, 0f, .25f, .25f);
+            warpCam.transform.position = Vector3.zero;
+            warpCam.enabled = false;
         }
 
         private void BuildDialogueCache()
@@ -123,6 +128,22 @@ namespace DebugMod
             }
         }
 
+        private void MoveWarpCam()
+        {
+            var SCC = PlayerMachine.controller;
+            var transform = SCC.currentGround.transform;
+            warpSimPos = SCC.transform.position;
+            Quaternion quaternion = transform.rotation * Quaternion.Inverse(SCC.LastGroundRot);
+            Vector3 PlatOffset = transform.position + 
+                quaternion * SCC.LastGroundOffset - (SCC.LastGroundPos + SCC.LastGroundOffset);
+            warpSimPos = SCC.transform.position + PlatOffset;
+
+            // Set up camera
+            warpCam.transform.position = warpSimPos;
+            warpCam.transform.rotation = Quaternion.LookRotation(PlayerMachine.lookDirection, Vector3.up);
+            warpCam.farClipPlane = PlayerMachine.Camera.GetComponent<Camera>().farClipPlane;
+        }
+
         public void ToggleState(bool enabled, PlayerMachine playerMachine)
         {
             _enabled = enabled;
@@ -145,7 +166,7 @@ namespace DebugMod
         private bool _visible = false;
         private bool deathPlaneStatus = true;
         private bool collisionRenderFlag = false;
-
+        private Vector3 warpSimPos = new Vector3(0f, 0f, 0f);
         public void Update()
         {
             if (Input.GetKeyDown(KeyCode.F11))
@@ -278,7 +299,7 @@ namespace DebugMod
 
                     var line = tv.gameObject.AddComponent<LineRenderer>();
                     var collider = tv.gameObject.GetComponent<Collider>();
-                    if(collider is SphereCollider)
+                    if (collider is SphereCollider)
                     {
                         float radius = (collider as SphereCollider).radius;
                         line.useWorldSpace = false;
@@ -297,7 +318,6 @@ namespace DebugMod
                     }
                 }
             }
-
             if (Input.GetKeyDown(KeyCode.M))
             {
                 var deathPlanes = FindObjectsOfType<VoidOut>();
@@ -310,7 +330,7 @@ namespace DebugMod
             else if (Input.GetKeyDown(KeyCode.V))
             {
                 collisionRenderFlag = !collisionRenderFlag;
-                if(collisionRenderFlag)
+                if (collisionRenderFlag)
                 {
                     BuildCollisionCache();
                 }
@@ -319,7 +339,26 @@ namespace DebugMod
                     if (c == null) break;
                     c.SetActive(collisionRenderFlag);
                 }
+            }
 
+            if ((Input.GetMouseButtonDown(3) || Input.GetKeyDown(KeyCode.R))
+                && PlayerMachine.currentState.Equals(PlayerStates.Jump)
+                && warpCam.enabled)
+            {
+                MoveWarpCam();
+
+                yaw = warpCam.transform.eulerAngles.y;
+                pitch = warpCam.transform.eulerAngles.x;
+            }
+            else if (Input.GetMouseButton(2))
+            {
+                yaw += Input.GetAxis("Mouse X") * 2f;
+                pitch -= Input.GetAxis("Mouse Y") * 2f;
+                warpCam.transform.eulerAngles = new Vector3(pitch, yaw, 0f);
+            }
+            else if (Input.GetKeyDown(KeyCode.B))
+            {
+                warpCam.enabled = !warpCam.enabled;
             }
 
             if (Input.GetKeyDown(KeyCode.N))
@@ -334,7 +373,7 @@ namespace DebugMod
                     var shader = Shader.Find("psx/trasparent/vertexlit");
                     if (renderer && shader)
                     {
-                        for(int i = 0; i < renderer.materials.Length; ++i)
+                        for (int i = 0; i < renderer.materials.Length; ++i)
                         {
                             var matl = renderer.materials[i];
                             matl.shader = shader;
@@ -371,6 +410,7 @@ namespace DebugMod
             t.text += "<K>: Get All Keys\n";
             t.text += "<V>: Render Death Planes: " + (collisionRenderFlag ? "ON" : "OFF") + "\n";
             t.text += "<M>: Active Death Planes: " + (deathPlaneStatus ? "ON" : "OFF") + "\n";
+            t.text += "<R><noparse><B></noparse>: Warp Cam Move/Toggle \n";
             t.text += "<N>: Set Obj Transparent\n";
             t.text += "<G>: Show NPC Talk Zone\n";
             t.text += "<F11> Toggle UI\n\n";
@@ -379,6 +419,14 @@ namespace DebugMod
             t.text += "SpawnPos:" + PlayerMachine.LastGroundLoc.ToString() + "\n";
             t.text += "Look Dir:" + PlayerMachine.lookDirection.ToString() + "\n";
             t.text += "Player State:" + PlayerMachine.currentState.ToString() + "\n";
+
+            if (warpCam.enabled)
+            {
+                t.text += "\nLGP:" + PlayerMachine.controller.LastGroundPos.ToString() + "\n";
+                t.text += "LGO:" + PlayerMachine.controller.LastGroundOffset.ToString() + "\n";
+                t.text += "LGR:" + PlayerMachine.controller.LastGroundRot.ToString() + "\n";
+                t.text += "Warp Pos:" + warpSimPos.ToString() + "\n";
+            }
         }
     }
 }

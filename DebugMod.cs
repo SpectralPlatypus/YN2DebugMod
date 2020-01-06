@@ -6,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "5.0";
+        private const string _modVersion = "6.1";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 chantroPos = new Vector3(926f, 44f, 364.7f);
