@@ -6,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "6.1";
+        private const string _modVersion = "6.2";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 chantroPos = new Vector3(926f, 44f, 364.7f);
@@ -34,10 +34,10 @@ namespace DebugMod
             }
             else
             {
-                if(counter) counter.ToggleState(false, null);
+                if (counter) counter.ToggleState(false, null);
             }
 
-            if(newScene.name == "void")
+            if (newScene.name == "void")
             {
                 Basic_NPC chantro = null;
                 var npcs = UnityEngine.Object.FindObjectsOfType<Basic_NPC>();

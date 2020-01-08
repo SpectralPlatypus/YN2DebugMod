@@ -134,7 +134,7 @@ namespace DebugMod
             var transform = SCC.currentGround.transform;
             warpSimPos = SCC.transform.position;
             Quaternion quaternion = transform.rotation * Quaternion.Inverse(SCC.LastGroundRot);
-            Vector3 PlatOffset = transform.position + 
+            Vector3 PlatOffset = transform.position +
                 quaternion * SCC.LastGroundOffset - (SCC.LastGroundPos + SCC.LastGroundOffset);
             warpSimPos = SCC.transform.position + PlatOffset;
 
@@ -342,7 +342,8 @@ namespace DebugMod
             }
 
             if ((Input.GetMouseButtonDown(3) || Input.GetKeyDown(KeyCode.R))
-                && PlayerMachine.currentState.Equals(PlayerStates.Jump)
+                && (PlayerMachine.currentState.Equals(PlayerStates.Jump) ||
+                PlayerMachine.currentState.Equals(PlayerStates.Loading))
                 && warpCam.enabled)
             {
                 MoveWarpCam();
@@ -425,6 +426,8 @@ namespace DebugMod
                 t.text += "\nLGP:" + PlayerMachine.controller.LastGroundPos.ToString() + "\n";
                 t.text += "LGO:" + PlayerMachine.controller.LastGroundOffset.ToString() + "\n";
                 t.text += "LGR:" + PlayerMachine.controller.LastGroundRot.ToString() + "\n";
+                t.text += "CG:" + PlayerMachine.controller.currentGround.transform.position.ToString() + "\n";
+                t.text += "CR:" + PlayerMachine.controller.currentGround.transform.rotation.ToString() + "\n";
                 t.text += "Warp Pos:" + warpSimPos.ToString() + "\n";
             }
         }
