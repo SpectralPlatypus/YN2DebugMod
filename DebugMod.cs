@@ -9,7 +9,7 @@ namespace DebugMod
         private const string _modVersion = "6.2";
         private DebugHUD counter = null;
         private static GameObject go = null;
-        private readonly Vector3 chantroPos = new Vector3(926f, 44f, 364.7f);
+        private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
 
         public DebugMod() : base("DebugMod")
         {
@@ -39,22 +39,22 @@ namespace DebugMod
 
             if (newScene.name == "void")
             {
-                Basic_NPC chantro = null;
+                Basic_NPC spectralNpc = null;
                 var npcs = UnityEngine.Object.FindObjectsOfType<Basic_NPC>();
 
                 foreach (var npc in npcs)
                 {
                     var textAsset = npc.GetComponentInChildren<TalkVolume>().Dialogue;
-                    if (DialogueUtils.GetNPCName(textAsset.text) == "Chantro")
+                    if (DialogueUtils.GetNPCName(textAsset.text) == "Oleia")
                     {
-                        chantro = npc;
+                        spectralNpc = npc;
                         break;
                     }
                 }
-                if (chantro != null)
+                if (spectralNpc != null)
                 {
                     LogDebug("Found Chantro!");
-                    UnityEngine.Object.Instantiate(chantro, chantroPos, Quaternion.identity);
+                    UnityEngine.Object.Instantiate(spectralNpc, npcPos, Quaternion.identity);
                     ModHooks.Instance.OnParseScriptHook += Instance_OnParseScriptHook;
                 }
             }
@@ -67,12 +67,12 @@ namespace DebugMod
         private string Instance_OnParseScriptHook(string text)
         {
             var playerPos = Manager.Player.GetComponent<PlayerMachine>().transform.position;
-            if (DialogueUtils.GetNPCName(text) != "Chantro" || Vector3.Distance(chantroPos, playerPos) > 5)
+            if (DialogueUtils.GetNPCName(text) != "Oleia" || Vector3.Distance(npcPos, playerPos) > 5)
             {
                 return text;
             }
 
-            return "%n9%v1%\r\nSpectral\r\n%m1%Have some fun with%m0%%s1% %m1%%sD%Warps!!\r\n\r\n%n\r\n";
+            return "%n13%v11%\r\nSpectral\r\n%m1%Get me pictures of%m0%%s1% %m1%%sD%Spiderman!\r\n\r\n%n\r\n";
         }
     }
 }
