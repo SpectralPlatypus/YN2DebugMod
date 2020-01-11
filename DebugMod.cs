@@ -6,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "6.2";
+        private const string _modVersion = "6.5";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
@@ -20,6 +20,7 @@ namespace DebugMod
         public override void Initialize()
         {
             SceneManager.activeSceneChanged += OnSceneChange;
+            ModHooks.Instance.OnParseScriptHook += Instance_OnParseScriptHook;
             go = new GameObject();
             counter = go.AddComponent<DebugHUD>();
             UnityEngine.Object.DontDestroyOnLoad(go);
@@ -40,7 +41,7 @@ namespace DebugMod
             if (newScene.name == "void")
             {
                 Basic_NPC spectralNpc = null;
-                var npcs = UnityEngine.Object.FindObjectsOfType<Basic_NPC>();
+                var npcs = Object.FindObjectsOfType<Basic_NPC>();
 
                 foreach (var npc in npcs)
                 {
@@ -54,25 +55,31 @@ namespace DebugMod
                 if (spectralNpc != null)
                 {
                     LogDebug("Found Chantro!");
-                    UnityEngine.Object.Instantiate(spectralNpc, npcPos, Quaternion.identity);
-                    ModHooks.Instance.OnParseScriptHook += Instance_OnParseScriptHook;
+                    Object.Instantiate(spectralNpc, npcPos, Quaternion.identity);
                 }
-            }
-            else
-            {
-                ModHooks.Instance.OnParseScriptHook -= Instance_OnParseScriptHook;
             }
         }
 
         private string Instance_OnParseScriptHook(string text)
         {
-            var playerPos = Manager.Player.GetComponent<PlayerMachine>().transform.position;
-            if (DialogueUtils.GetNPCName(text) != "Oleia" || Vector3.Distance(npcPos, playerPos) > 5)
+            string output = text;
+            switch (DialogueUtils.GetNPCName(text))
             {
-                return text;
+                case "Oleia":
+                    var playerPos = Manager.Player.GetComponent<PlayerMachine>().transform.position;
+                    if (SceneManager.GetActiveScene().name == "void" &&
+                        Vector3.Distance(npcPos, playerPos) <= 5f)
+                    {
+                        output =
+                            "%n13%v11%\r\nSpectral\r\n%m1%Get me pictures of%m0%%s1% %m1%%sD%Spiderman!\r\n\r\n%n\r\n";
+                    }
+                    break;
+                case "Denise":
+                    output = text.Replace(@"%v14", @"%v6");
+                    break;
             }
 
-            return "%n13%v11%\r\nSpectral\r\n%m1%Get me pictures of%m0%%s1% %m1%%sD%Spiderman!\r\n\r\n%n\r\n";
+            return output;
         }
     }
 }

@@ -85,8 +85,6 @@ namespace DebugMod
                     textAsset.text.StartsWith("%n"))
                 {
                     string npcName = Pepperoni.DialogueUtils.GetNPCName(textAsset.text);
-                    // Remove unused and/or broken NPC dialogues -- thanks Denise
-                    if (npcName == string.Empty || npcName == "Denise") continue;
                     dialogues.Add(new NPCCache(npcName, textAsset));
                 }
             }
@@ -147,10 +145,11 @@ namespace DebugMod
         public void ToggleState(bool enabled, PlayerMachine playerMachine)
         {
             _enabled = enabled;
-            PlayerMachine = (_enabled) ? playerMachine : null;
+            PlayerMachine = null;
 
             if (_enabled)
             {
+                PlayerMachine = playerMachine;
                 BuildDialogueCache();
                 collisionRenderFlag = false;
             }
@@ -188,6 +187,9 @@ namespace DebugMod
             if (Input.GetKeyDown(KeyCode.F1) || Input.GetKeyDown(KeyCode.Keypad1))
             {
                 bool? a = PlayerMachine.CoyoteFrameEnabled;
+                PlayerMachine.CoyoteFrameEnabled =
+                    a.HasValue ? (a.Value ? false : new bool?()) : true;
+                /*
                 if (a.HasValue)
                 {
                     if (a.Value) a = false;
@@ -196,6 +198,7 @@ namespace DebugMod
                 else
                     a = true;
                 Manager.Player.GetComponent<PlayerMachine>().CoyoteFrameEnabled = a;
+                */
             }
 
             if (Input.GetKeyDown(KeyCode.LeftBracket))
@@ -205,7 +208,7 @@ namespace DebugMod
             }
             else if (Input.GetKeyDown(KeyCode.RightBracket))
             {
-                currentCostIdx = (currentCostIdx + 1) % (MAX_COSTUME_INDEX + 1);
+                currentCostIdx = (currentCostIdx + 1) % (costumeNames.Length);
             }
             else if (Input.GetKeyDown(KeyCode.F2) || Input.GetKeyDown(KeyCode.Keypad2))
             {
