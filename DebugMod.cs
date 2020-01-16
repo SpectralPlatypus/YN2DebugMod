@@ -6,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "6.5";
+        private const string _modVersion = "6.6";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
@@ -54,7 +54,7 @@ namespace DebugMod
                 }
                 if (spectralNpc != null)
                 {
-                    LogDebug("Found Chantro!");
+                    LogDebug("Found Spectral!");
                     Object.Instantiate(spectralNpc, npcPos, Quaternion.identity);
                 }
             }
@@ -71,7 +71,8 @@ namespace DebugMod
                         Vector3.Distance(npcPos, playerPos) <= 5f)
                     {
                         output =
-                            "%n13%v11%\r\nSpectral\r\n%m1%Get me pictures of%m0%%s1% %m1%%sD%Spiderman!\r\n\r\n%n\r\n";
+                            "%n10%v0%\r\nSpectral\r\n" +
+                            "%m1%When is the %m0%%s.5%%sD%%p15%%e1%%e2%Android%p10%%m1% port getting released anyway?\r\n\r\n%n\r\n";
                     }
                     break;
                 case "Denise":
