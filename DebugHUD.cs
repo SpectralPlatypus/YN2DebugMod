@@ -208,7 +208,7 @@ namespace DebugMod
         public static bool NoClipActive = false;
         private void SetupNoClip(bool toggle)
         {
-            if(toggle)
+            if (toggle)
             {
                 origMask = PlayerMachine.controller.Walkable;
                 origGrav = PlayerMachine.Gravity;
@@ -366,7 +366,7 @@ namespace DebugMod
                     tvRadiusCache.ToggleAllObjects(talkVolumeRenderFlag);
             }
 
-            if(Input.GetKeyDown(KeyCode.T) && !PlayerMachine.currentState.Equals(PlayerStates.Loading))
+            if (Input.GetKeyDown(KeyCode.T) && !PlayerMachine.currentState.Equals(PlayerStates.Loading))
                 SetupNoClip(!NoClipActive);
 
             if (Input.GetKeyDown(KeyCode.M))
@@ -381,7 +381,7 @@ namespace DebugMod
             else if (Input.GetKeyDown(KeyCode.V))
             {
                 collisionRenderFlag = !collisionRenderFlag;
-                if(collisionRenderFlag)
+                if (collisionRenderFlag)
                     collPlaneCache.UpdateCache(VoidOutCreator, collisionRenderFlag);
                 else
                     collPlaneCache.ToggleAllObjects(collisionRenderFlag);
@@ -470,7 +470,7 @@ namespace DebugMod
             t.text += "Look Dir:" + PlayerMachine.lookDirection.ToString() + "\n";
             t.text += "Player State:" + PlayerMachine.currentState.ToString() + "\n";
 
-            if(bossController)
+            if (bossController)
             {
                 t.text += "\nBoss Health: " + bossController.Health + "\n";
                 t.text += "Boss State: " + bossStates[(int)BossController.State] + "\n";
