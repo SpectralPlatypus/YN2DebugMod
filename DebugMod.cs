@@ -6,11 +6,11 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "6.6";
+        private const string _modVersion = "7.8";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
-
+        private float npcDistance = 0.0f;
         public DebugMod() : base("DebugMod")
         {
         }
@@ -21,10 +21,37 @@ namespace DebugMod
         {
             SceneManager.activeSceneChanged += OnSceneChange;
             ModHooks.Instance.OnParseScriptHook += Instance_OnParseScriptHook;
+            On.PlayerMachine.Jump_SuperUpdate += PlayerMachine_Jump_SuperUpdate;
+
             go = new GameObject();
             counter = go.AddComponent<DebugHUD>();
             UnityEngine.Object.DontDestroyOnLoad(go);
         }
+
+        //For noclip fun
+        private void PlayerMachine_Jump_SuperUpdate(On.PlayerMachine.orig_Jump_SuperUpdate orig, PlayerMachine self)
+        {
+            if(DebugHUD.NoClipActive)
+            {
+                self.Gravity = 0f;
+                orig(self);
+                self.VerticalVelocity = Vector3.zero;
+                if (Kueido.Input.Jump.Held)
+                {
+                    self.transform.position += self.controller.up / 8;
+                }
+                else if (Input.GetKey(KeyCode.LeftControl))
+                {
+                    self.transform.position -= self.controller.up / 8;
+                }
+            }
+            else
+            {
+               orig(self);
+            }
+        }
+
+
 
         private void OnSceneChange(Scene oldScene, Scene newScene)
         {
@@ -49,6 +76,11 @@ namespace DebugMod
                     if (DialogueUtils.GetNPCName(textAsset.text) == "Oleia")
                     {
                         spectralNpc = npc;
+                        var collider = npc.GetComponentInChildren<Collider>();
+                        if (collider)
+                        {
+                            npcDistance = collider.bounds.size.x;
+                        }
                         break;
                     }
                 }
@@ -68,11 +100,11 @@ namespace DebugMod
                 case "Oleia":
                     var playerPos = Manager.Player.GetComponent<PlayerMachine>().transform.position;
                     if (SceneManager.GetActiveScene().name == "void" &&
-                        Vector3.Distance(npcPos, playerPos) <= 5f)
+                        Vector3.Distance(npcPos, playerPos) <= npcDistance)
                     {
                         output =
                             "%n10%v0%\r\nSpectral\r\n" +
-                            "%m1%When is the %m0%%s.5%%sD%%p15%%e1%%e2%Android%p10%%m1% port getting released anyway?\r\n\r\n%n\r\n";
+                            "%m1%Please discover %m0%%s.5%%sD%%p15%%e1%%e2%Mike%p10%%m1% skip...\r\n\r\n%n\r\n";
                     }
                     break;
                 case "Denise":

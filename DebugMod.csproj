@@ -34,8 +34,9 @@
     <Reference Include="Assembly-CSharp-firstpass">
       <HintPath>..\Pepperoni\Vanilla\Assembly-CSharp-firstpass.dll</HintPath>
     </Reference>
-    <Reference Include="OUTPUT_Assembly-CSharp">
-      <HintPath>..\Pepperoni\Pepperoni\bin\Debug\OUTPUT_Assembly-CSharp.dll</HintPath>
+    <Reference Include="OUTPUT_Assembly-CSharp, Version=0.0.0.0, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Pepperoni\Pepperoni\bin\Release\OUTPUT_Assembly-CSharp.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
@@ -81,13 +82,17 @@
   <ItemGroup>
     <Compile Include="DebugHUD.cs" />
     <Compile Include="DebugMod.cs" />
+    <Compile Include="GameObjectCache.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
-    <EmbeddedResource Include="glass_texture.png" />
+    <EmbeddedResource Include="glass.png" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="talkVol.png" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <PropertyGroup>
-    <PostBuildEvent>copy /Y "$(TargetPath)" "D:\Games\Yo Noid 2 GOAY - Mod\noid_Data\Managed\Mods\$(TargetFileName)"</PostBuildEvent>
+    <PostBuildEvent>copy /Y "$(TargetPath)" "F:\Games\Yo Noid 2 GOAY - Mod\noid_Data\Managed\Mods\$(TargetFileName)"</PostBuildEvent>
   </PropertyGroup>
 </Project>

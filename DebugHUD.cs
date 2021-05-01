@@ -28,14 +28,17 @@ namespace DebugMod
         private static CanvasUtil.RectData topRight = new CanvasUtil.RectData(new Vector2(0, 0), new Vector2(0, 0),
                     new Vector2(0.89f, 0.80f), new Vector2(0.99f, .96f), new Vector2(0, 0));
         private static PlayerMachine PlayerMachine = null;
+        private static BossController bossController = null;
         private bool _enabled = false;
         private float yaw = 0f;
         private float pitch = 0f;
 
-        private List<NPCCache> dialogues = new List<NPCCache>(10);
-        private List<GameObject> collisionPlaneCache = new List<GameObject>(5);
-        private Texture2D glassTexture = null;
-        private Camera warpCam = null;
+        List<NPCCache> dialogues = new List<NPCCache>(10);
+        GameObjectCache<VoidOut> collPlaneCache = new GameObjectCache<VoidOut>();
+        GameObjectCache<TalkVolume> tvRadiusCache = new GameObjectCache<TalkVolume>();
+        Dictionary<string, Texture2D> modTextures = new Dictionary<string, Texture2D>(2);
+        Camera warpCam = null;
+
         public void Awake()
         {
             DontDestroyOnLoad(gameObject);
@@ -54,18 +57,18 @@ namespace DebugMod
 
             foreach (string fn in Assembly.GetExecutingAssembly().GetManifestResourceNames())
             {
-                if (fn.Contains("glass_texture"))
+                if (fn.Contains("glass") || fn.Contains("talkVol"))
                 {
                     using (Stream imageStream = Assembly.GetExecutingAssembly().GetManifestResourceStream(fn))
                     {
                         byte[] imageBuffer = new byte[imageStream.Length];
                         imageStream.Read(imageBuffer, 0, imageBuffer.Length);
                         imageStream.Flush();
-                        glassTexture = new Texture2D(1, 1);
-                        glassTexture.LoadImage(imageBuffer);
-                        Logger.LogDebug("Loaded Glass Texture");
+                        var assetName = fn.Contains("glass") ? "glass" : "talkVol";
+                        modTextures[assetName] = new Texture2D(1, 1);
+                        modTextures[assetName].LoadImage(imageBuffer);
+                        Logger.Log($"Loaded Texture: {assetName}");
                     }
-                    break;
                 }
             }
             warpCam = gameObject.AddComponent<Camera>();
@@ -90,40 +93,69 @@ namespace DebugMod
             }
         }
 
-        private void BuildCollisionCache()
+        private GameObject VoidOutCreator(VoidOut voidOut)
         {
-            collisionPlaneCache.Clear();
-            var deathPlanes = FindObjectsOfType<VoidOut>();
-            foreach (var d in deathPlanes)
+
+            var collObj = voidOut.GetComponent<Collider>();
+            Logger.LogDebug("Found Collider of type " + collObj.GetType().Name);
+
+            if (!(collObj is BoxCollider) && !(collObj is MeshCollider))
+                return null;
+
+            var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
+
+            if (collObj is BoxCollider)
             {
-                var collObj = d.GetComponent<Collider>();
-                Logger.LogDebug("Found Collider of type " + collObj.GetType().Name);
-
-                if (!(collObj is BoxCollider) && !(collObj is MeshCollider))
-                    continue;
-
-                var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
-
-                if (collObj is BoxCollider)
-                {
-                    var boxCol = collObj as BoxCollider;
-                    go.transform.position = boxCol.transform.TransformPoint(boxCol.center);
-                    go.transform.localScale = boxCol.bounds.size;
-                    go.GetComponent<MeshRenderer>().material.color = Color.white;
-                }
-                else
-                {
-                    var meshCol = collObj as MeshCollider;
-                    go.transform.position = d.transform.position;
-                    go.transform.localScale = meshCol.transform.localScale;
-                    go.GetComponent<MeshFilter>().mesh = meshCol.sharedMesh;
-                    go.GetComponent<MeshRenderer>().material.color = Color.grey;
-                }
-
-                go.GetComponent<Collider>().enabled = false;
-                go.GetComponent<MeshRenderer>().receiveShadows = false;
-                collisionPlaneCache.Add(go);
+                var boxCol = collObj as BoxCollider;
+                go.transform.position = boxCol.transform.TransformPoint(boxCol.center);
+                go.transform.localScale = boxCol.bounds.size;
+                go.GetComponent<MeshRenderer>().material.color = Color.white;
             }
+            else
+            {
+                var meshCol = collObj as MeshCollider;
+                go.transform.position = voidOut.transform.position;
+                go.transform.localScale = meshCol.transform.localScale;
+                go.GetComponent<MeshFilter>().mesh = meshCol.sharedMesh;
+                go.GetComponent<MeshRenderer>().material.color = Color.grey;
+            }
+
+            go.GetComponent<Collider>().enabled = false;
+            go.GetComponent<MeshRenderer>().receiveShadows = false;
+            return go;
+        }
+
+        private GameObject TalkVolumeCreator(TalkVolume tv)
+        {
+            if (!modTextures.ContainsKey("talkVol"))
+            {
+                Logger.LogError("Missing Talk Volume Texture!");
+                return null;
+            }
+
+            var collider = tv.gameObject.GetComponent<Collider>();
+            if (collider is SphereCollider)
+            {
+                var talkSphere = collider as SphereCollider;
+                var go = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+                go.transform.position = tv.transform.position;
+                go.transform.localScale = talkSphere.bounds.size;
+                var renderer = go.GetComponent<Renderer>();
+                var shader = Shader.Find("psx/trasparent/vertexlit");
+                if (renderer && shader)
+                {
+                    for (int i = 0; i < renderer.materials.Length; ++i)
+                    {
+                        var matl = renderer.materials[i];
+                        matl.shader = shader;
+                        matl.SetTexture("_MainTex", modTextures["talkVol"]);
+                        renderer.materials[i] = matl;
+                    }
+                }
+                go.GetComponent<MeshRenderer>().receiveShadows = false;
+                return go;
+            }
+            return null;
         }
 
         private void MoveWarpCam()
@@ -146,18 +178,59 @@ namespace DebugMod
         {
             _enabled = enabled;
             PlayerMachine = null;
+            bossController = null;
+
+            // Search for Boss
+            var go = GameObject.Find("Boss Room");
 
             if (_enabled)
             {
                 PlayerMachine = playerMachine;
                 BuildDialogueCache();
+
+                tvRadiusCache.ClearCache();
+                talkVolumeRenderFlag = false;
+                tvRadiusCache.UpdateCache(TalkVolumeCreator, talkVolumeRenderFlag);
+
+                collPlaneCache.ClearCache();
                 collisionRenderFlag = false;
+                collPlaneCache.UpdateCache(VoidOutCreator, collisionRenderFlag);
+
+                if (go)
+                {
+                    bossController = go.GetComponent<BossRoomController>().Boss;
+                }
             }
+        }
+
+        LayerMask origMask;
+        float origGrav;
+        public static bool NoClipActive = false;
+        private void SetupNoClip(bool toggle)
+        {
+            if(toggle)
+            {
+                origMask = PlayerMachine.controller.Walkable;
+                origGrav = PlayerMachine.Gravity;
+                PlayerMachine.controller.currentGround.walkable = 0;
+                PlayerMachine.controller.Walkable = 0;
+            }
+            else
+            {
+                PlayerMachine.controller.currentGround.walkable = origMask;
+                PlayerMachine.controller.Walkable = origMask;
+                PlayerMachine.Gravity = origGrav;
+            }
+
+            NoClipActive = toggle;
+
         }
 
         private static readonly int MAX_COSTUME_INDEX = 3;
         private static string[] costumeNames = { "Noid", "Green", "Sanic", "Cappy" };
         private static string[] levelNames = { "LeviLevle", "dungeon", "PZNTv5" };
+        private static string[] bossStates = { "Idle", "Damaged", "Movement", "WaitForIdle",
+            "Dead", "WaitForIntro", "Intro", "Outro" };
         private int currentCostIdx = 0;
         private int currentNpcIdx = 0;
         private int currentLvlIdx = 0;
@@ -165,6 +238,7 @@ namespace DebugMod
         private bool _visible = false;
         private bool deathPlaneStatus = true;
         private bool collisionRenderFlag = false;
+        private bool talkVolumeRenderFlag = false;
         private Vector3 warpSimPos = new Vector3(0f, 0f, 0f);
         public void Update()
         {
@@ -189,16 +263,6 @@ namespace DebugMod
                 bool? a = PlayerMachine.CoyoteFrameEnabled;
                 PlayerMachine.CoyoteFrameEnabled =
                     a.HasValue ? (a.Value ? false : new bool?()) : true;
-                /*
-                if (a.HasValue)
-                {
-                    if (a.Value) a = false;
-                    else a = null;
-                }
-                else
-                    a = true;
-                Manager.Player.GetComponent<PlayerMachine>().CoyoteFrameEnabled = a;
-                */
             }
 
             if (Input.GetKeyDown(KeyCode.LeftBracket))
@@ -295,32 +359,16 @@ namespace DebugMod
 
             if (Input.GetKeyDown(KeyCode.G))
             {
-                foreach (var tv in FindObjectsOfType<TalkVolume>())
-                {
-                    if (tv.gameObject.GetComponent<LineRenderer>())
-                        continue;
-
-                    var line = tv.gameObject.AddComponent<LineRenderer>();
-                    var collider = tv.gameObject.GetComponent<Collider>();
-                    if (collider is SphereCollider)
-                    {
-                        float radius = (collider as SphereCollider).radius;
-                        line.useWorldSpace = false;
-                        line.startWidth = .1f;
-                        line.endWidth = .1f;
-                        line.positionCount = 360 + 1;
-                        var pointCount = 360 + 1; // add extra point to make startpoint and endpoint the same to close the circle
-                        var points = new Vector3[pointCount];
-                        for (int i = 0; i < pointCount; i++)
-                        {
-                            var rad = Mathf.Deg2Rad * (i * 360f / 360);
-                            points[i] = new Vector3(Mathf.Sin(rad) * radius, 0, Mathf.Cos(rad) * radius);
-                        }
-
-                        line.SetPositions(points);
-                    }
-                }
+                talkVolumeRenderFlag = !talkVolumeRenderFlag;
+                if (talkVolumeRenderFlag)
+                    tvRadiusCache.UpdateCache(TalkVolumeCreator, talkVolumeRenderFlag);
+                else
+                    tvRadiusCache.ToggleAllObjects(talkVolumeRenderFlag);
             }
+
+            if(Input.GetKeyDown(KeyCode.T) && !PlayerMachine.currentState.Equals(PlayerStates.Loading))
+                SetupNoClip(!NoClipActive);
+
             if (Input.GetKeyDown(KeyCode.M))
             {
                 var deathPlanes = FindObjectsOfType<VoidOut>();
@@ -333,15 +381,10 @@ namespace DebugMod
             else if (Input.GetKeyDown(KeyCode.V))
             {
                 collisionRenderFlag = !collisionRenderFlag;
-                if (collisionRenderFlag)
-                {
-                    BuildCollisionCache();
-                }
-                foreach (var c in collisionPlaneCache)
-                {
-                    if (c == null) break;
-                    c.SetActive(collisionRenderFlag);
-                }
+                if(collisionRenderFlag)
+                    collPlaneCache.UpdateCache(VoidOutCreator, collisionRenderFlag);
+                else
+                    collPlaneCache.ToggleAllObjects(collisionRenderFlag);
             }
 
             if ((Input.GetMouseButtonDown(3) || Input.GetKeyDown(KeyCode.R))
@@ -365,7 +408,7 @@ namespace DebugMod
                 warpCam.enabled = !warpCam.enabled;
             }
 
-            if (Input.GetKeyDown(KeyCode.N))
+            if (Input.GetKeyDown(KeyCode.N) && modTextures.ContainsKey("glass"))
             {
                 if (Physics.Raycast(
                     PlayerMachine.transform.position + PlayerMachine.controller.up * PlayerMachine.controller.height * 0.85f,
@@ -381,7 +424,8 @@ namespace DebugMod
                         {
                             var matl = renderer.materials[i];
                             matl.shader = shader;
-                            matl.SetTexture("_MainTex", glassTexture);
+                            matl.SetTexture("_MainTex", modTextures["glass"]);
+                            matl.SetColor("_Color", Color.blue);
                             renderer.materials[i] = matl;
                         }
                         GameObject go = new GameObject();
@@ -414,9 +458,11 @@ namespace DebugMod
             t.text += "<K>: Get All Keys\n";
             t.text += "<V>: Render Death Planes: " + (collisionRenderFlag ? "ON" : "OFF") + "\n";
             t.text += "<M>: Active Death Planes: " + (deathPlaneStatus ? "ON" : "OFF") + "\n";
+            t.text += "<G>: Show NPC Talk Zone: " + (talkVolumeRenderFlag ? "ON" : "OFF") + "\n";
             t.text += "<R><noparse><B></noparse>: Warp Cam Move/Toggle \n";
             t.text += "<N>: Set Obj Transparent\n";
-            t.text += "<G>: Show NPC Talk Zone\n";
+            t.text += "<T>: NoClip: " + (NoClipActive ? "ON" : "OFF") + "\n";
+            // t.text += "<'>: Reset Camera Events\n";
             t.text += "<F11> Toggle UI\n\n";
             t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
             t.text += "Pos:" + PlayerMachine.transform.position + "\n";
@@ -424,6 +470,11 @@ namespace DebugMod
             t.text += "Look Dir:" + PlayerMachine.lookDirection.ToString() + "\n";
             t.text += "Player State:" + PlayerMachine.currentState.ToString() + "\n";
 
+            if(bossController)
+            {
+                t.text += "\nBoss Health: " + bossController.Health + "\n";
+                t.text += "Boss State: " + bossStates[(int)BossController.State] + "\n";
+            }
             if (warpCam.enabled)
             {
                 t.text += "\nLGP:" + PlayerMachine.controller.LastGroundPos.ToString() + "\n";
