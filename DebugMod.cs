@@ -104,7 +104,7 @@ namespace DebugMod
                     {
                         output =
                             "%n10%v0%\r\nSpectral\r\n" +
-                            "%m1%Please discover %m0%%s.5%%sD%%p15%%e1%%e2%Mike%p10%%m1% skip...\r\n\r\n%n\r\n";
+                            "%m1%Run %m0%%s.5%%sD%%p15%%e1%%e2%All%p10%%m1% NPCs!\r\n\r\n%n\r\n";
                     }
                     break;
                 case "Denise":
