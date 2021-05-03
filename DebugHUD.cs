@@ -13,31 +13,56 @@ namespace DebugMod
     {
         private struct NPCCache
         {
-            public string npcName;
-            public TextAsset textAsset;
+            public string NpcName { get; private set; }
+            public TextAsset TextAsset { get; private set; }
 
             public NPCCache(string npc, TextAsset asset)
             {
-                npcName = npc;
-                textAsset = asset;
+                NpcName = npc;
+                TextAsset = asset;
             }
         }
 
-        public static GameObject OverlayCanvas = null;
-        private static GameObject _textPanel;
-        private static CanvasUtil.RectData topRight = new CanvasUtil.RectData(new Vector2(0, 0), new Vector2(0, 0),
+        static GameObject OverlayCanvas = null;
+        static GameObject _textPanel;
+        static CanvasUtil.RectData topRight = new CanvasUtil.RectData(new Vector2(0, 0), new Vector2(0, 0),
                     new Vector2(0.89f, 0.80f), new Vector2(0.99f, .96f), new Vector2(0, 0));
-        private static PlayerMachine PlayerMachine = null;
-        private static BossController bossController = null;
-        private bool _enabled = false;
-        private float yaw = 0f;
-        private float pitch = 0f;
 
-        List<NPCCache> dialogues = new List<NPCCache>(10);
+        PlayerMachine PlayerMachine = null;
+        BossController bossController = null;
+        bool _enabled = false;
+
+        // Cached objects
+        List<NPCCache> dialogueCache = new List<NPCCache>(10);
         GameObjectCache<VoidOut> collPlaneCache = new GameObjectCache<VoidOut>();
         GameObjectCache<TalkVolume> tvRadiusCache = new GameObjectCache<TalkVolume>();
         Dictionary<string, Texture2D> modTextures = new Dictionary<string, Texture2D>(2);
+
+        // Warp cam related
         Camera warpCam = null;
+        float yaw = 0f;
+        float pitch = 0f;
+
+        // Noclip mode
+        LayerMask origMask;
+        float origGrav;
+        public static bool NoClipActive = false;
+
+        // UI constants
+        static readonly string[] costumeNames = { "Noid", "Green", "Sanic", "Cappy" };
+        static readonly string[] levelNames = { "LeviLevle", "dungeon", "PZNTv5" };
+        static readonly string[] bossStates = { "Idle", "Damaged", "Movement", "WaitForIdle",
+            "Dead", "WaitForIntro", "Intro", "Outro" };
+
+        int currentCostIdx = 0;
+        int currentNpcIdx = 0;
+        int currentLvlIdx = 0;
+        float deltaTime = 0f;
+        bool _visible = false;
+        bool deathPlaneStatus = true;
+        bool collisionRenderFlag = false;
+        bool talkVolumeRenderFlag = false;
+        Vector3 warpSimPos = new Vector3(0f, 0f, 0f);
 
         public void Awake()
         {
@@ -79,7 +104,7 @@ namespace DebugMod
 
         private void BuildDialogueCache()
         {
-            dialogues.Clear();
+            dialogueCache.Clear();
             currentNpcIdx = 0;
             var res = Resources.FindObjectsOfTypeAll<TextAsset>();
             foreach (var textAsset in res)
@@ -88,14 +113,15 @@ namespace DebugMod
                     textAsset.text.StartsWith("%n"))
                 {
                     string npcName = Pepperoni.DialogueUtils.GetNPCName(textAsset.text);
-                    dialogues.Add(new NPCCache(npcName, textAsset));
+                    dialogueCache.Add(new NPCCache(npcName, textAsset));
                 }
             }
+            dialogueCache.Sort((dia1, dia2) =>
+            dia1.TextAsset.text.Length.CompareTo(dia2.TextAsset.text.Length));
         }
 
         private GameObject VoidOutCreator(VoidOut voidOut)
         {
-
             var collObj = voidOut.GetComponent<Collider>();
             Logger.LogDebug("Found Collider of type " + collObj.GetType().Name);
 
@@ -121,7 +147,6 @@ namespace DebugMod
             }
 
             go.GetComponent<Collider>().enabled = false;
-            go.GetComponent<MeshRenderer>().receiveShadows = false;
             return go;
         }
 
@@ -152,7 +177,6 @@ namespace DebugMod
                         renderer.materials[i] = matl;
                     }
                 }
-                go.GetComponent<MeshRenderer>().receiveShadows = false;
                 return go;
             }
             return null;
@@ -203,9 +227,6 @@ namespace DebugMod
             }
         }
 
-        LayerMask origMask;
-        float origGrav;
-        public static bool NoClipActive = false;
         private void SetupNoClip(bool toggle)
         {
             if (toggle)
@@ -226,20 +247,6 @@ namespace DebugMod
 
         }
 
-        private static readonly int MAX_COSTUME_INDEX = 3;
-        private static string[] costumeNames = { "Noid", "Green", "Sanic", "Cappy" };
-        private static string[] levelNames = { "LeviLevle", "dungeon", "PZNTv5" };
-        private static string[] bossStates = { "Idle", "Damaged", "Movement", "WaitForIdle",
-            "Dead", "WaitForIntro", "Intro", "Outro" };
-        private int currentCostIdx = 0;
-        private int currentNpcIdx = 0;
-        private int currentLvlIdx = 0;
-        private float deltaTime = 0f;
-        private bool _visible = false;
-        private bool deathPlaneStatus = true;
-        private bool collisionRenderFlag = false;
-        private bool talkVolumeRenderFlag = false;
-        private Vector3 warpSimPos = new Vector3(0f, 0f, 0f);
         public void Update()
         {
             if (Input.GetKeyDown(KeyCode.F11))
@@ -268,7 +275,7 @@ namespace DebugMod
             if (Input.GetKeyDown(KeyCode.LeftBracket))
             {
                 if (--currentCostIdx < 0)
-                    currentCostIdx = MAX_COSTUME_INDEX;
+                    currentCostIdx = costumeNames.Length - 1;
             }
             else if (Input.GetKeyDown(KeyCode.RightBracket))
             {
@@ -283,15 +290,15 @@ namespace DebugMod
             if (Input.GetKeyDown(KeyCode.Comma))
             {
                 if (--currentNpcIdx < 0)
-                    currentNpcIdx = dialogues.Count - 1;
+                    currentNpcIdx = dialogueCache.Count - 1;
             }
             else if (Input.GetKeyDown(KeyCode.Period))
             {
-                currentNpcIdx = (currentNpcIdx + 1) % dialogues.Count;
+                currentNpcIdx = (currentNpcIdx + 1) % dialogueCache.Count;
             }
             else if (Input.GetKeyDown(KeyCode.F3))
             {
-                GameObject.FindGameObjectWithTag("Manager").GetComponent<DialogueSystem>().Begin(dialogues[currentNpcIdx].textAsset, null);
+                GameObject.FindGameObjectWithTag("Manager").GetComponent<DialogueSystem>().Begin(dialogueCache[currentNpcIdx].TextAsset, null);
             }
 
             if (Input.GetKeyDown(KeyCode.F4) || Input.GetKeyDown(KeyCode.Keypad4))
@@ -444,17 +451,26 @@ namespace DebugMod
                 }
             }
 
+            if (Input.GetKeyDown(KeyCode.F8))
+            {
+                foreach (var e in FindObjectsOfType<HiddenPlatform>())
+                {
+                    if (!e.cameraActive) e.flag = false;
+                }
+            }
+
             deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
             bool? b = PlayerMachine.CoyoteFrameEnabled;
 
             t.text += "FPS: " + 1f / deltaTime + "\n";
             t.text += "<F1>: Coyote Frames: " + (b.HasValue ? (b.Value ? "ON" : "OFF") : "Default") + "\n";
             t.text += "<F2><[]>: Set Costume: " + costumeNames[currentCostIdx] + "\n";
-            if (dialogues.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogues[currentNpcIdx].npcName + "\n";
+            if (dialogueCache.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogueCache[currentNpcIdx].NpcName + "\n";
             t.text += "<F4>: Time Scale: x" + Time.timeScale.ToString("F2") + "\n";
             t.text += "<F5>: Text Storage/Warp\n";
             t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
             t.text += "<F7><L>: Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
+            t.text += "<F8>: Reset Camera Events\n";
             t.text += "<K>: Get All Keys\n";
             t.text += "<V>: Render Death Planes: " + (collisionRenderFlag ? "ON" : "OFF") + "\n";
             t.text += "<M>: Active Death Planes: " + (deathPlaneStatus ? "ON" : "OFF") + "\n";
@@ -462,7 +478,6 @@ namespace DebugMod
             t.text += "<R><noparse><B></noparse>: Warp Cam Move/Toggle \n";
             t.text += "<N>: Set Obj Transparent\n";
             t.text += "<T>: NoClip: " + (NoClipActive ? "ON" : "OFF") + "\n";
-            // t.text += "<'>: Reset Camera Events\n";
             t.text += "<F11> Toggle UI\n\n";
             t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
             t.text += "Pos:" + PlayerMachine.transform.position + "\n";
@@ -487,4 +502,3 @@ namespace DebugMod
         }
     }
 }
-
