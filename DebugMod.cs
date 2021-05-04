@@ -6,7 +6,7 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "7.8";
+        private const string _modVersion = "8.0";
         private DebugHUD counter = null;
         private static GameObject go = null;
         private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
@@ -25,7 +25,7 @@ namespace DebugMod
 
             go = new GameObject();
             counter = go.AddComponent<DebugHUD>();
-            UnityEngine.Object.DontDestroyOnLoad(go);
+            Object.DontDestroyOnLoad(go);
         }
 
         //For noclip fun
@@ -73,6 +73,7 @@ namespace DebugMod
                 foreach (var npc in npcs)
                 {
                     var textAsset = npc.GetComponentInChildren<TalkVolume>().Dialogue;
+                    LogDebug(DialogueUtils.GetNPCName(textAsset.text));
                     if (DialogueUtils.GetNPCName(textAsset.text) == "Oleia")
                     {
                         spectralNpc = npc;
@@ -104,7 +105,7 @@ namespace DebugMod
                     {
                         output =
                             "%n10%v0%\r\nSpectral\r\n" +
-                            "%m1%Run %m0%%s.5%%sD%%p15%%e1%%e2%All%p10%%m1% NPCs!\r\n\r\n%n\r\n";
+                            "%m1%Run%p11% %m0%%s.1%A%p8%l%p9%l %p10%%m1%N%p15%P%p16%Cs%p17%%sD%%p10%!\r\n\r\n%n\r\n";
                     }
                     break;
                 case "Denise":

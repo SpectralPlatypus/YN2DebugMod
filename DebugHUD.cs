@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Reflection;
+using System.Text;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -25,28 +26,31 @@ namespace DebugMod
 
         static GameObject OverlayCanvas = null;
         static GameObject _textPanel;
+        static TextMeshProUGUI textComp;
         static CanvasUtil.RectData topRight = new CanvasUtil.RectData(new Vector2(0, 0), new Vector2(0, 0),
                     new Vector2(0.89f, 0.80f), new Vector2(0.99f, .96f), new Vector2(0, 0));
 
         PlayerMachine PlayerMachine = null;
         BossController bossController = null;
-        bool _enabled = false;
+
 
         // Cached objects
         List<NPCCache> dialogueCache = new List<NPCCache>(10);
         GameObjectCache<VoidOut> collPlaneCache = new GameObjectCache<VoidOut>();
         GameObjectCache<TalkVolume> tvRadiusCache = new GameObjectCache<TalkVolume>();
         Dictionary<string, Texture2D> modTextures = new Dictionary<string, Texture2D>(2);
+        StringBuilder textBuilder = new StringBuilder(500);
 
         // Warp cam related
         Camera warpCam = null;
+        Vector3 warpSimPos = Vector3.zero;
         float yaw = 0f;
         float pitch = 0f;
 
         // Noclip mode
         LayerMask origMask;
         float origGrav;
-        public static bool NoClipActive = false;
+        public static bool NoClipActive { get; private set; } = false;
 
         // UI constants
         static readonly string[] costumeNames = { "Noid", "Green", "Sanic", "Cappy" };
@@ -58,11 +62,13 @@ namespace DebugMod
         int currentNpcIdx = 0;
         int currentLvlIdx = 0;
         float deltaTime = 0f;
+
+        bool _enabled = false;
         bool _visible = false;
+
         bool deathPlaneStatus = true;
         bool collisionRenderFlag = false;
         bool talkVolumeRenderFlag = false;
-        Vector3 warpSimPos = new Vector3(0f, 0f, 0f);
 
         public void Awake()
         {
@@ -78,6 +84,7 @@ namespace DebugMod
                 _textPanel = CanvasUtil.CreateTMProPanel(_background, string.Empty, 20,
                     TextAnchor.UpperLeft,
                     new CanvasUtil.RectData(new Vector2(-5, -5), new Vector2(0, 0), new Vector2(0, 0), new Vector2(1, 1)));
+                textComp = _textPanel.GetComponent<TextMeshProUGUI>();
             }
 
             foreach (string fn in Assembly.GetExecutingAssembly().GetManifestResourceNames())
@@ -247,18 +254,20 @@ namespace DebugMod
 
         }
 
+        string OnOffStr(bool val) => val ? "ON" : "OFF";
+
         public void Update()
         {
             if (Input.GetKeyDown(KeyCode.F11))
             {
                 _visible = !_visible;
+                var cg = OverlayCanvas.GetComponent<CanvasGroup>();
                 StartCoroutine(_visible
-                    ? CanvasUtil.FadeInCanvasGroup(OverlayCanvas.GetComponent<CanvasGroup>())
-                    : CanvasUtil.FadeOutCanvasGroup(OverlayCanvas.GetComponent<CanvasGroup>()));
+                    ? CanvasUtil.FadeInCanvasGroup(cg)
+                    : CanvasUtil.FadeOutCanvasGroup(cg));
             }
 
-            var t = _textPanel.GetComponent<TextMeshProUGUI>();
-            t.text = "";
+            textComp.text = "";
 
             if (!_enabled || !_visible || PlayerMachine == null)
             {
@@ -319,14 +328,8 @@ namespace DebugMod
 
             if (Input.GetKeyDown(KeyCode.F6) || Input.GetKeyDown(KeyCode.Keypad6))
             {
-                if (QualitySettings.vSyncCount == 2)
-                {
-                    QualitySettings.vSyncCount = 0;
-                }
-                else
-                {
-                    QualitySettings.vSyncCount++;
-                }
+                ++QualitySettings.vSyncCount;
+                QualitySettings.vSyncCount %= 3;
             }
 
             bool inVoid = SceneManager.GetActiveScene().name == "void";
@@ -335,7 +338,7 @@ namespace DebugMod
                 var pizza = FindObjectOfType<PizzaBox>();
                 if (pizza == null)
                 {
-                    Logger.LogDebug("No PizzaBox!");
+                    Logger.LogError("No PizzaBox!");
                 }
                 else
                 {
@@ -344,7 +347,7 @@ namespace DebugMod
                     GameObject.Find("Global Manager").GetComponent<Manager>().LoadScene(level, pizza.ExitId, pizza.gameObject);
                 }
             }
-            else if (Input.GetKeyDown(KeyCode.L))
+            else if (inVoid && Input.GetKeyDown(KeyCode.L))
             {
                 do
                 {
@@ -352,7 +355,7 @@ namespace DebugMod
                 } while (levelNames[currentLvlIdx] == SceneManager.GetActiveScene().name);
             }
 
-            if (Input.GetKeyDown(KeyCode.K))
+            if (!inVoid && Input.GetKeyDown(KeyCode.K))
             {
                 var key = FindObjectsOfType<Key>();
                 foreach (var k in key)
@@ -451,7 +454,7 @@ namespace DebugMod
                 }
             }
 
-            if (Input.GetKeyDown(KeyCode.F8))
+            if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.Keypad8))
             {
                 foreach (var e in FindObjectsOfType<HiddenPlatform>())
                 {
@@ -462,43 +465,50 @@ namespace DebugMod
             deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
             bool? b = PlayerMachine.CoyoteFrameEnabled;
 
-            t.text += "FPS: " + 1f / deltaTime + "\n";
-            t.text += "<F1>: Coyote Frames: " + (b.HasValue ? (b.Value ? "ON" : "OFF") : "Default") + "\n";
-            t.text += "<F2><[]>: Set Costume: " + costumeNames[currentCostIdx] + "\n";
-            if (dialogueCache.Count > 0) t.text += "<F3><,.>: Dialogue: " + dialogueCache[currentNpcIdx].NpcName + "\n";
-            t.text += "<F4>: Time Scale: x" + Time.timeScale.ToString("F2") + "\n";
-            t.text += "<F5>: Text Storage/Warp\n";
-            t.text += "<F6>: VSync Count :" + QualitySettings.vSyncCount + "\n";
-            t.text += "<F7><L>: Level Load: " + (!inVoid ? "void" : levelNames[currentLvlIdx]) + "\n";
-            t.text += "<F8>: Reset Camera Events\n";
-            t.text += "<K>: Get All Keys\n";
-            t.text += "<V>: Render Death Planes: " + (collisionRenderFlag ? "ON" : "OFF") + "\n";
-            t.text += "<M>: Active Death Planes: " + (deathPlaneStatus ? "ON" : "OFF") + "\n";
-            t.text += "<G>: Show NPC Talk Zone: " + (talkVolumeRenderFlag ? "ON" : "OFF") + "\n";
-            t.text += "<R><noparse><B></noparse>: Warp Cam Move/Toggle \n";
-            t.text += "<N>: Set Obj Transparent\n";
-            t.text += "<T>: NoClip: " + (NoClipActive ? "ON" : "OFF") + "\n";
-            t.text += "<F11> Toggle UI\n\n";
-            t.text += "Move Dir:" + PlayerMachine.moveDirection.ToString() + "\n";
-            t.text += "Pos:" + PlayerMachine.transform.position + "\n";
-            t.text += "SpawnPos:" + PlayerMachine.LastGroundLoc.ToString() + "\n";
-            t.text += "Look Dir:" + PlayerMachine.lookDirection.ToString() + "\n";
-            t.text += "Player State:" + PlayerMachine.currentState.ToString() + "\n";
+            textBuilder.Length = 0;
+            textBuilder.AppendFormat("FPS: {0:F3}\n", 1f / deltaTime);
+            textBuilder.AppendFormat("<F1>: Coyote Frames: {0}\n", b.HasValue ? OnOffStr(b.Value) : "Default");
+            textBuilder.Append("<F2><[]>: Set Costume: ").AppendLine(costumeNames[currentCostIdx]);
+            textBuilder.AppendFormat("<F3><,.>: Dialogue: ").AppendLine(dialogueCache[currentNpcIdx].NpcName);
+            textBuilder.Append("<F4>: Time Scale: x").AppendLine(Time.timeScale.ToString("F2"));
+            textBuilder.Append("<F5>: Text Storage/Warp\n");
+            textBuilder.AppendFormat("<F6>: VSync Count :{0}\n", QualitySettings.vSyncCount);
+            textBuilder.AppendFormat("<F7><L>: Level Load: {0}\n", !inVoid ? "void" : levelNames[currentLvlIdx]);
+            textBuilder.Append("<F8>: Reset Camera Events\n");
+            textBuilder.Append("<K>: Get All Keys\n");
+            textBuilder.Append("<V>: Render Death Planes: ").AppendLine(OnOffStr(collisionRenderFlag));
+            textBuilder.Append("<M>: Active Death Planes: ").AppendLine(OnOffStr(deathPlaneStatus));
+            textBuilder.Append("<G>: Show NPC Talk Zone: ").AppendLine(OnOffStr(talkVolumeRenderFlag));
+            textBuilder.Append("<R><noparse><B></noparse>: Warp Cam Move/Toggle\n");
+            textBuilder.Append("<N>: Set Obj Transparent\n");
+            textBuilder.Append("<T>: NoClip: ").AppendLine(OnOffStr(NoClipActive));
+            textBuilder.Append("<F11> Toggle UI\n").AppendLine();
+
+            textBuilder.Append("Move Dir:").AppendLine(PlayerMachine.moveDirection.ToString());
+            textBuilder.Append("Pos:").AppendLine(PlayerMachine.transform.position.ToString());
+            textBuilder.Append("SpawnPos:").AppendLine(PlayerMachine.LastGroundLoc.ToString());
+            textBuilder.Append("Look Dir:").AppendLine(PlayerMachine.lookDirection.ToString());
+            textBuilder.Append("Player State:").AppendLine(PlayerMachine.currentState.ToString());
 
             if (bossController)
             {
-                t.text += "\nBoss Health: " + bossController.Health + "\n";
-                t.text += "Boss State: " + bossStates[(int)BossController.State] + "\n";
+                textBuilder.AppendLine();
+                textBuilder.Append("Boss Health: ").AppendLine(bossController.Health.ToString());
+                textBuilder.Append("Boss State: ").AppendLine(bossStates[(int)BossController.State]);
             }
             if (warpCam.enabled)
             {
-                t.text += "\nLGP:" + PlayerMachine.controller.LastGroundPos.ToString() + "\n";
-                t.text += "LGO:" + PlayerMachine.controller.LastGroundOffset.ToString() + "\n";
-                t.text += "LGR:" + PlayerMachine.controller.LastGroundRot.ToString() + "\n";
-                t.text += "CG:" + PlayerMachine.controller.currentGround.transform.position.ToString() + "\n";
-                t.text += "CR:" + PlayerMachine.controller.currentGround.transform.rotation.ToString() + "\n";
-                t.text += "Warp Pos:" + warpSimPos.ToString() + "\n";
+                textBuilder.AppendLine();
+                textBuilder.Append("LGP:").AppendLine(PlayerMachine.controller.LastGroundPos.ToString());
+                textBuilder.Append("LGO:").AppendLine(PlayerMachine.controller.LastGroundOffset.ToString());
+                textBuilder.Append("LGR:").AppendLine(PlayerMachine.controller.LastGroundRot.ToString());
+                textBuilder.Append("CG:").AppendLine(PlayerMachine.controller.currentGround.transform.position.ToString());
+                textBuilder.Append("CR:").AppendLine(PlayerMachine.controller.currentGround.transform.rotation.ToString());
+                textBuilder.Append("Warp Pos:").AppendLine(warpSimPos.ToString());
+
             }
+
+            textComp.SetText(textBuilder);
         }
     }
 }
