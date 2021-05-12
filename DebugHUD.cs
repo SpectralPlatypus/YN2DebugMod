@@ -50,7 +50,7 @@ namespace DebugMod
         // Noclip mode
         LayerMask origMask;
         float origGrav;
-        public static bool NoClipActive { get; private set; } = false;
+        public bool NoClipActive { get; private set; } = false;
 
         // UI constants
         static readonly string[] costumeNames = { "Noid", "Green", "Sanic", "Cappy" };
@@ -69,6 +69,7 @@ namespace DebugMod
         bool deathPlaneStatus = true;
         bool collisionRenderFlag = false;
         bool talkVolumeRenderFlag = false;
+        public bool CamEventReset { get; private set; } = false;
 
         public void Awake()
         {
@@ -456,10 +457,7 @@ namespace DebugMod
 
             if (Input.GetKeyDown(KeyCode.F8) || Input.GetKeyDown(KeyCode.Keypad8))
             {
-                foreach (var e in FindObjectsOfType<HiddenPlatform>())
-                {
-                    if (!e.cameraActive) e.flag = false;
-                }
+                CamEventReset = !CamEventReset;
             }
 
             deltaTime += (Time.unscaledDeltaTime - deltaTime) * 0.1f;
@@ -474,11 +472,11 @@ namespace DebugMod
             textBuilder.Append("<F5>: Text Storage/Warp\n");
             textBuilder.AppendFormat("<F6>: VSync Count :{0}\n", QualitySettings.vSyncCount);
             textBuilder.AppendFormat("<F7><L>: Level Load: {0}\n", !inVoid ? "void" : levelNames[currentLvlIdx]);
-            textBuilder.Append("<F8>: Reset Camera Events\n");
-            textBuilder.Append("<K>: Get All Keys\n");
+            textBuilder.AppendFormat("<F8>: Repeat Cam Events: {0}\n", OnOffStr(CamEventReset));
             textBuilder.Append("<V>: Render Death Planes: ").AppendLine(OnOffStr(collisionRenderFlag));
             textBuilder.Append("<M>: Active Death Planes: ").AppendLine(OnOffStr(deathPlaneStatus));
             textBuilder.Append("<G>: Show NPC Talk Zone: ").AppendLine(OnOffStr(talkVolumeRenderFlag));
+            textBuilder.Append("<K>: Get All Keys\n");
             textBuilder.Append("<R><noparse><B></noparse>: Warp Cam Move/Toggle\n");
             textBuilder.Append("<N>: Set Obj Transparent\n");
             textBuilder.Append("<T>: NoClip: ").AppendLine(OnOffStr(NoClipActive));

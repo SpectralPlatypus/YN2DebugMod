@@ -6,8 +6,8 @@ namespace DebugMod
 {
     public class DebugMod : Mod
     {
-        private const string _modVersion = "8.0";
-        private DebugHUD counter = null;
+        private const string _modVersion = "8.2";
+        private DebugHUD modHUD = null;
         private static GameObject go = null;
         private readonly Vector3 npcPos = new Vector3(926f, 44f, 364.7f);
         private float npcDistance = 0.0f;
@@ -19,19 +19,27 @@ namespace DebugMod
 
         public override void Initialize()
         {
+            go = new GameObject();
+            modHUD = go.AddComponent<DebugHUD>();
+            Object.DontDestroyOnLoad(go);
+
             SceneManager.activeSceneChanged += OnSceneChange;
             ModHooks.Instance.OnParseScriptHook += Instance_OnParseScriptHook;
             On.PlayerMachine.Jump_SuperUpdate += PlayerMachine_Jump_SuperUpdate;
+            On.HiddenPlatform.Activate += HiddenPlatform_Activate;
+        }
 
-            go = new GameObject();
-            counter = go.AddComponent<DebugHUD>();
-            Object.DontDestroyOnLoad(go);
+        private void HiddenPlatform_Activate(On.HiddenPlatform.orig_Activate orig, HiddenPlatform self)
+        {
+            bool temp = self.flag;
+            orig(self);
+            if (modHUD.CamEventReset && temp) self.flag = false;
         }
 
         //For noclip fun
         private void PlayerMachine_Jump_SuperUpdate(On.PlayerMachine.orig_Jump_SuperUpdate orig, PlayerMachine self)
         {
-            if(DebugHUD.NoClipActive)
+            if (modHUD.NoClipActive)
             {
                 self.Gravity = 0f;
                 orig(self);
@@ -47,7 +55,7 @@ namespace DebugMod
             }
             else
             {
-               orig(self);
+                orig(self);
             }
         }
 
@@ -58,11 +66,11 @@ namespace DebugMod
             var playerMachine = Manager.Player.GetComponent<PlayerMachine>();
             if (playerMachine)
             {
-                counter.ToggleState(true, playerMachine);
+                modHUD.ToggleState(true, playerMachine);
             }
             else
             {
-                if (counter) counter.ToggleState(false, null);
+                if (modHUD) modHUD.ToggleState(false, null);
             }
 
             if (newScene.name == "void")
