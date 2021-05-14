@@ -81,7 +81,6 @@ namespace DebugMod
                 foreach (var npc in npcs)
                 {
                     var textAsset = npc.GetComponentInChildren<TalkVolume>().Dialogue;
-                    LogDebug(DialogueUtils.GetNPCName(textAsset.text));
                     if (DialogueUtils.GetNPCName(textAsset.text) == "Oleia")
                     {
                         spectralNpc = npc;

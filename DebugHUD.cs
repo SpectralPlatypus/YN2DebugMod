@@ -70,6 +70,7 @@ namespace DebugMod
         bool collisionRenderFlag = false;
         bool talkVolumeRenderFlag = false;
         public bool CamEventReset { get; private set; } = false;
+        private bool camEventsFound = false;
 
         public void Awake()
         {
@@ -228,6 +229,8 @@ namespace DebugMod
                 collisionRenderFlag = false;
                 collPlaneCache.UpdateCache(VoidOutCreator, collisionRenderFlag);
 
+                camEventsFound = FindObjectsOfType<HiddenPlatform>().Length > 0;
+
                 if (go)
                 {
                     bossController = go.GetComponent<BossRoomController>().Boss;
@@ -297,18 +300,21 @@ namespace DebugMod
                 GameObject.FindGameObjectWithTag("Manager").GetComponent<DialogueSystem>().UpdateCostumePortrait();
             }
 
-            if (Input.GetKeyDown(KeyCode.Comma))
+            if (dialogueCache.Count > 0)
             {
-                if (--currentNpcIdx < 0)
-                    currentNpcIdx = dialogueCache.Count - 1;
-            }
-            else if (Input.GetKeyDown(KeyCode.Period))
-            {
-                currentNpcIdx = (currentNpcIdx + 1) % dialogueCache.Count;
-            }
-            else if (Input.GetKeyDown(KeyCode.F3))
-            {
-                GameObject.FindGameObjectWithTag("Manager").GetComponent<DialogueSystem>().Begin(dialogueCache[currentNpcIdx].TextAsset, null);
+                if (Input.GetKeyDown(KeyCode.Comma))
+                {
+                    if (--currentNpcIdx < 0)
+                        currentNpcIdx = dialogueCache.Count - 1;
+                }
+                else if (Input.GetKeyDown(KeyCode.Period))
+                {
+                    currentNpcIdx = (currentNpcIdx + 1) % dialogueCache.Count;
+                }
+                else if (Input.GetKeyDown(KeyCode.F3))
+                {
+                    GameObject.FindGameObjectWithTag("Manager").GetComponent<DialogueSystem>().Begin(dialogueCache[currentNpcIdx].TextAsset, null);
+                }
             }
 
             if (Input.GetKeyDown(KeyCode.F4) || Input.GetKeyDown(KeyCode.Keypad4))
@@ -464,15 +470,18 @@ namespace DebugMod
             bool? b = PlayerMachine.CoyoteFrameEnabled;
 
             textBuilder.Length = 0;
+
             textBuilder.AppendFormat("FPS: {0:F3}\n", 1f / deltaTime);
             textBuilder.AppendFormat("<F1>: Coyote Frames: {0}\n", b.HasValue ? OnOffStr(b.Value) : "Default");
             textBuilder.Append("<F2><[]>: Set Costume: ").AppendLine(costumeNames[currentCostIdx]);
-            textBuilder.AppendFormat("<F3><,.>: Dialogue: ").AppendLine(dialogueCache[currentNpcIdx].NpcName);
+            if(dialogueCache.Count > 0)
+                textBuilder.AppendFormat("<F3><,.>: Dialogue: ").AppendLine(dialogueCache[currentNpcIdx].NpcName);
             textBuilder.Append("<F4>: Time Scale: x").AppendLine(Time.timeScale.ToString("F2"));
             textBuilder.Append("<F5>: Text Storage/Warp\n");
             textBuilder.AppendFormat("<F6>: VSync Count :{0}\n", QualitySettings.vSyncCount);
             textBuilder.AppendFormat("<F7><L>: Level Load: {0}\n", !inVoid ? "void" : levelNames[currentLvlIdx]);
-            textBuilder.AppendFormat("<F8>: Repeat Cam Events: {0}\n", OnOffStr(CamEventReset));
+            if(camEventsFound)
+                textBuilder.AppendFormat("<F8>: Repeat Cam Events: {0}\n", OnOffStr(CamEventReset));
             textBuilder.Append("<V>: Render Death Planes: ").AppendLine(OnOffStr(collisionRenderFlag));
             textBuilder.Append("<M>: Active Death Planes: ").AppendLine(OnOffStr(deathPlaneStatus));
             textBuilder.Append("<G>: Show NPC Talk Zone: ").AppendLine(OnOffStr(talkVolumeRenderFlag));
@@ -506,7 +515,8 @@ namespace DebugMod
 
             }
 
-            textComp.SetText(textBuilder);
+            // Set text causes visual glitches
+            textComp.text += textBuilder.ToString();
         }
     }
 }
